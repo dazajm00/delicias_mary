@@ -1,39 +1,8 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pedidos Mesa {{ $mesa->numero }} - Las Delicias de Mary</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #faf6f1; }
-        .navbar-delicias { background: #2b1f1a; }
-        .btn-delicias { background: #b5432a; border-color: #b5432a; color: #fff; }
-        .btn-delicias:hover { background: #973520; border-color: #973520; color: #fff; }
-    </style>
-</head>
-<body>
-    <!-- Barra superior -->
-    <nav class="navbar navbar-expand navbar-dark navbar-delicias">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand fw-semibold" href="{{ route('inicio') }}">Las Delicias de Mary</a>
-            <ul class="navbar-nav ms-auto align-items-center gap-2">
-                @if (session('rol') === 'ADMINISTRADOR')
-                    <li class="nav-item"><a class="nav-link" href="{{ route('usuarios.index') }}">Usuarios</a></li>
-                @endif
-                <li class="nav-item"><a class="nav-link active" href="{{ route('mesas.index') }}">Mesas</a></li>
-                <li class="nav-item">
-                    <span class="nav-link text-white-50">{{ session('nombre') }} · {{ ucfirst(strtolower(session('rol'))) }}</span>
-                </li>
-                <li class="nav-item">
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-light">Cerrar sesión</button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    </nav>
+@extends('layouts.app')
+
+@section('title', 'Inicio')
+
+@section('content')
 
     <div class="container-fluid px-4 py-4">
         @if (session('success'))
@@ -50,6 +19,26 @@
             </h1>
             <a href="{{ route('mesas.index') }}">← Volver a mesas</a>
         </div>
+
+        <div class="text-end mb-2">
+            @if (request('cancelados'))
+                <a href="{{ route('pedidos.index', $mesa) }}" class="small">Ocultar cancelados</a>
+            @else
+                <a href="{{ route('pedidos.index', ['mesa' => $mesa, 'cancelados' => 1]) }}" class="small">Mostrar cancelados</a>
+            @endif
+        </div>
+
+        @if ($pedidos->count() > 0)
+            <div class="alert alert-light border d-flex justify-content-between align-items-center">
+                <span>Consumo total de la mesa</span>
+                <strong class="fs-5">
+                    ${{ number_format(
+                        $pedidos->where('estado', '!=', 'CANCELADO')
+                                ->sum(fn ($p) => $p->detalles->sum(fn ($d) => $d->cantidad * $d->precio_unitario)),
+                        0, ',', '.') }}
+                </strong>
+            </div>
+        @endif
 
         @forelse ($pedidos as $pedido)
             @php
@@ -78,27 +67,62 @@
                         </div>
 
                         @if ($pedido->estado === 'PENDIENTE')
-                            <form method="POST" action="{{ route('pedidos.cancelar', $pedido) }}"
-                                  onsubmit="return confirm('¿Cancelar este pedido? La cocina ya no lo preparará.')">
+                            <div class="d-flex gap-2">
+                                @if (session('rol') === 'MESERO')
+                                    <a href="{{ route('pedidos.edit', $pedido) }}" class="btn btn-outline-secondary">Editar</a>
+                                @endif
+                                <form method="POST" action="{{ route('pedidos.cancelar', $pedido) }}"
+                                    onsubmit="return confirm('¿Cancelar este pedido? La cocina ya no lo preparará.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-danger">Cancelar pedido</button>
+                                </form>
+                            </div>
+                        @endif
+                        @if ($pedido->estado === 'LISTO' && session('rol') === 'MESERO')
+                            <form method="POST" action="{{ route('pedidos.entregar', $pedido) }}">
                                 @csrf
-                                <button type="submit" class="btn btn-outline-danger">Cancelar pedido</button>
+                                <button type="submit" class="btn btn-success">Marcar entregado</button>
                             </form>
                         @endif
                     </div>
 
                     <ul class="list-group list-group-flush mt-2">
-                        @foreach ($pedido->detalles as $detalle)
-                            <li class="list-group-item px-0 d-flex justify-content-between">
-                                <span>
-                                    {{ $detalle->descripcion() }}
-                                    @if ($detalle->observaciones)
-                                        <br><small class="text-muted">Obs.: {{ $detalle->observaciones }}</small>
-                                    @endif
-                                </span>
-                                <span class="text-muted">x{{ $detalle->cantidad }}</span>
+                        @foreach ($pedido->detalles->whereNull('id_detalle_padre') as $detalle)
+                            <li class="list-group-item px-0">
+                                <div class="d-flex justify-content-between">
+                                    <span>
+                                        {{ $detalle->descripcion() }}
+                                        @if ($detalle->cantidad > 1)
+                                            <span class="text-muted">x{{ $detalle->cantidad }}</span>
+                                        @endif
+                                    </span>
+                                    <span>
+                                        @if ($detalle->precio_unitario !== null)
+                                            ${{ number_format($detalle->precio_unitario * $detalle->cantidad, 0, ',', '.') }}
+                                        @endif
+                                    </span>
+                                </div>
+
+                                @foreach ($detalle->adicionales as $extra)
+                                    <div class="d-flex justify-content-between small text-success ps-3">
+                                        <span>+ {{ $extra->plato->nombre ?? 'Adicional' }}@if ($extra->cantidad > 1) x{{ $extra->cantidad }}@endif</span>
+                                        <span>${{ number_format($extra->precio_unitario * $extra->cantidad, 0, ',', '.') }}</span>
+                                    </div>
+                                @endforeach
+
+                                @if ($detalle->observaciones)
+                                    <div class="small text-muted ps-3">Obs.: {{ $detalle->observaciones }}</div>
+                                @endif
                             </li>
                         @endforeach
                     </ul>
+
+                    @if ($pedido->estado !== 'CANCELADO')
+                        <div class="text-end fw-semibold mt-2">
+                            Total del pedido:
+                            ${{ number_format($pedido->detalles->sum(fn ($d) => $d->cantidad * $d->precio_unitario), 0, ',', '.') }}
+                        </div>
+                    @endif
                 </div>
             </div>
         @empty
@@ -106,4 +130,4 @@
         @endforelse
     </div>
 </body>
-</html>
+@endsection

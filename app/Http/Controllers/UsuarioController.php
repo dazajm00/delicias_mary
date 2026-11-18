@@ -42,9 +42,11 @@ class UsuarioController extends Controller
 
         $request->validate([
             'nombre'     => 'required|max:100',
-            'usuario'    => 'required|max:50|unique:usuarios,usuario',
+            'usuario'    => ['required', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9_.]+$/', 'unique:usuarios,usuario'],
             'contrasena' => 'required|min:6|max:255',
             'id_rol'     => 'required|exists:roles,id_rol',
+        ], [
+            'usuario.regex' => 'El usuario solo puede tener letras sin tilde, números, punto y guion bajo, sin espacios.',
         ]);
 
         // Crear el usuario en la base de datos (la contraseña se guarda cifrada)
@@ -82,11 +84,13 @@ class UsuarioController extends Controller
 
         $request->validate([
             'nombre'     => 'required|max:100',
-            'usuario'    => 'required|max:50|unique:usuarios,usuario,' . $usuario->id_usuario . ',id_usuario',
+            'usuario'    => ['required', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9_.]+$/', 'unique:usuarios,usuario,' . $usuario->id_usuario . ',id_usuario'],
             'contrasena' => 'nullable|min:6|max:255',
             'id_rol'     => 'required|exists:roles,id_rol',
             'activo'     => 'required|boolean',
             'bloqueado'  => 'required|boolean',
+        ], [
+            'usuario.regex' => 'El usuario solo puede tener letras sin tilde, números, punto y guion bajo, sin espacios.',
         ]);
 
         $usuario->nombre    = $request->nombre;
@@ -110,10 +114,10 @@ class UsuarioController extends Controller
         return redirect()->route('usuarios.index')->with('success', 'Usuario actualizado correctamente.');
     }
 
-    /**
-     * Desactivar el usuario. No se borra de la base de datos (RF-11).
+        /**
+     * Activar o desactivar un usuario. No se borra de la base de datos (RF-11).
      */
-    public function destroy(Usuario $usuario)
+    public function cambiarEstado(Usuario $usuario)
     {
         abort_unless(session('rol') === 'ADMINISTRADOR', 403);
 
@@ -121,9 +125,32 @@ class UsuarioController extends Controller
             return redirect()->route('usuarios.index')->with('error', 'No puedes desactivar tu propia cuenta.');
         }
 
-        $usuario->activo = false;
+        $usuario->activo = ! $usuario->activo;
         $usuario->save();
 
-        return redirect()->route('usuarios.index')->with('success', 'Usuario desactivado. Ya no podrá iniciar sesión.');
+        return redirect()->route('usuarios.index')->with('success', $usuario->activo
+            ? "«{$usuario->nombre}» fue activado."
+            : "«{$usuario->nombre}» fue desactivado. Ya no podrá iniciar sesión.");
+    }
+
+    /**
+     * Eliminar un usuario. Solo si nunca registró pedidos; si no, se desactiva.
+     */
+    public function destroy(Usuario $usuario)
+    {
+        abort_unless(session('rol') === 'ADMINISTRADOR', 403);
+
+        if ($usuario->id_usuario == session('id_usuario')) {
+            return redirect()->route('usuarios.index')->with('error', 'No puedes eliminar tu propia cuenta.');
+        }
+
+        if ($usuario->pedidos()->exists()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', "«{$usuario->nombre}» ya registró pedidos y no se puede eliminar sin perder el historial. Puedes desactivarlo.");
+        }
+
+        $usuario->delete();
+
+        return redirect()->route('usuarios.index')->with('success', 'Usuario eliminado.');
     }
 }

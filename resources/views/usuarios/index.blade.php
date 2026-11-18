@@ -1,36 +1,8 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Usuarios - Las Delicias de Mary</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #faf6f1; }
-        .navbar-delicias { background: #2b1f1a; }
-        .btn-delicias { background: #b5432a; border-color: #b5432a; color: #fff; }
-        .btn-delicias:hover { background: #973520; border-color: #973520; color: #fff; }
-    </style>
-</head>
-<body>
-    <!-- Barra superior -->
-    <nav class="navbar navbar-expand navbar-dark navbar-delicias">
-        <div class="container">
-            <a class="navbar-brand fw-semibold" href="{{ route('inicio') }}">Las Delicias de Mary</a>
-            <ul class="navbar-nav ms-auto align-items-center gap-2">
-                <li class="nav-item"><a class="nav-link active" href="{{ route('usuarios.index') }}">Usuarios</a></li>
-                <li class="nav-item">
-                    <span class="nav-link text-white-50">{{ session('nombre') }} · Administrador</span>
-                </li>
-                <li class="nav-item">
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-light">Cerrar sesión</button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    </nav>
+@extends('layouts.app')
+
+@section('title', 'Usuarios')
+
+@section('content')
 
     <div class="container py-4">
         @if (session('success'))
@@ -41,7 +13,10 @@
         @endif
 
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="h3 m-0">Usuarios</h1>
+            <div>
+                <h1 class="h3 m-0">Usuarios</h1>
+                <a href="{{ route('inicio') }}" class="small">← Volver al inicio</a>
+            </div>
             <a href="{{ route('usuarios.create') }}" class="btn btn-delicias">+ Nuevo usuario</a>
         </div>
 
@@ -72,14 +47,24 @@
                                         <span class="badge text-bg-success">Activo</span>
                                     @endif
                                 </td>
-                                <td class="text-end">
+                                                                <td class="text-end">
                                     <a href="{{ route('usuarios.edit', $usuario) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
-                                    @if ($usuario->activo)
+
+                                    @if ($usuario->id_usuario != session('id_usuario'))
+                                        <form method="POST" action="{{ route('usuarios.estado', $usuario) }}" class="d-inline"
+                                            onsubmit="return confirm('{{ $usuario->activo ? '¿Desactivar este usuario? No podrá iniciar sesión.' : '¿Activar este usuario?' }}')">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                {{ $usuario->activo ? 'Desactivar' : 'Activar' }}
+                                            </button>
+                                        </form>
+
                                         <form method="POST" action="{{ route('usuarios.destroy', $usuario) }}" class="d-inline"
-                                              onsubmit="return confirm('¿Desactivar este usuario? No podrá iniciar sesión.')">
+                                            onsubmit="return confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Desactivar</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
                                         </form>
                                     @endif
                                 </td>
@@ -94,5 +79,4 @@
             </div>
         </div>
     </div>
-</body>
-</html>
+@endsection

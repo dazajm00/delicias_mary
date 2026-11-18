@@ -35,4 +35,9 @@ class Pedido extends Model
     {
         return $this->hasMany(DetallePedido::class, 'id_pedido', 'id_pedido');
     }
+    // Total del pedido: suma de todas sus líneas (platos, adicionales y productos)
+    public function total(): float
+    {
+        return (float) $this->detalles->sum(fn ($d) => $d->cantidad * $d->precio_unitario);
+    }
 }

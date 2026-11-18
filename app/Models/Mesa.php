@@ -31,11 +31,34 @@ class Mesa extends Model
 
     public function pedidosEnCurso()
     {
-        return $this->pedidos()->whereIn('estado', self::ESTADOS_EN_CURSO);
+        return $this->pedidos()->whereIn('estado', self::ESTADOS_EN_CURSO)->whereNull('id_pago');
+    }
+
+    // Pedidos que todavía no se han cobrado (los cancelados no cuentan)
+    public function pedidosPorCobrar()
+    {
+        return $this->pedidos()->where('estado', '!=', 'CANCELADO')->whereNull('id_pago');
     }
 
     public function tienePedidosEnCurso(): bool
     {
         return $this->pedidosEnCurso()->exists();
+    }
+
+        public function reservas()
+    {
+        return $this->hasMany(Reserva::class, 'id_mesa', 'id_mesa');
+    }
+
+    // Reservas activas de hoy que ya están dentro de la hora de aviso (1 hora antes)
+    public function reservasVigentes()
+    {
+        $limite = now()->addHour();
+        $hasta  = $limite->isToday() ? $limite->format('H:i:s') : '23:59:59';
+
+        return $this->reservas()
+            ->where('estado', 'ACTIVA')
+            ->whereDate('fecha', today())
+            ->whereTime('hora', '<=', $hasta);
     }
 }

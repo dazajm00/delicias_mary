@@ -16,7 +16,7 @@ class DetallePedido extends Model
     // tipo = ARMADO -> plato que arma el mesero con insumos (id_plato queda NULL)
     // tipo = MENU   -> producto del menú fijo (id_plato apunta a platos)
     protected $fillable = [
-        'id_pedido', 'tipo', 'id_plato', 'cantidad',
+        'id_pedido', 'id_detalle_padre', 'tipo', 'id_plato', 'cantidad',
         'precio_unitario', 'observaciones', 'cancelado'
     ];
 
@@ -40,6 +40,11 @@ class DetallePedido extends Model
         return $this->belongsToMany(Insumo::class, 'detalle_pedido_insumo', 'id_detalle_pedido', 'id_insumo');
     }
 
+        // Adicionales (ej. huevo frito) que pertenecen a este plato armado
+    public function adicionales()
+    {
+        return $this->hasMany(DetallePedido::class, 'id_detalle_padre', 'id_detalle_pedido');
+    }
     // Texto que ve la cocina: "Arroz · Frijoles · Carne de cerdo asada" o "Jugo de mora"
     public function descripcion(): string
     {

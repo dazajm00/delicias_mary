@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
+use App\Models\Mesa;
+use App\Models\Pedido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
@@ -32,7 +34,7 @@ class LoginController extends Controller
             'contrasena' => 'required',
         ]);
 
-        $usuario = Usuario::with('rol')->where('usuario', $request->usuario)->first();
+        $usuario = Usuario::with('rol')->where('usuario', trim($request->usuario))->first();
 
         // El usuario no existe
         if (! $usuario) {
@@ -81,12 +83,27 @@ class LoginController extends Controller
     /**
      * Página de inicio según el rol.
      */
-    public function inicio()
+        public function inicio()
     {
         if (! session('id_usuario')) {
             return redirect()->route('login');
         }
-        return view('inicio');
+
+        // Datos del panel, solo para el administrador
+        $datos = [];
+        if (session('rol') === 'ADMINISTRADOR') {
+            $mesas = Mesa::where('activa', true);
+
+            $datos = [
+                'mesasDisponibles' => (clone $mesas)->where('estado', 'DISPONIBLE')->count(),
+                'mesasOcupadas'    => (clone $mesas)->where('estado', 'OCUPADA')->count(),
+                'mesasReservadas'  => (clone $mesas)->where('estado', 'RESERVADA')->count(),
+                'pedidosEnCurso'   => Pedido::whereIn('estado', Mesa::ESTADOS_EN_CURSO)->whereNull('id_pago')->count(),
+                'usuariosActivos'  => Usuario::where('activo', true)->count(),
+            ];
+        }
+
+        return view('inicio', $datos);
     }
 
     /**
